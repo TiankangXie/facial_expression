@@ -1,5 +1,7 @@
 # %%
 import torch
+from os import path
+import numpy as np
 from torchvision.datasets import ImageFolder
 from torch.utils.data import Subset
 from sklearn.model_selection import train_test_split
@@ -8,6 +10,8 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import PIL.Image
+import pandas as pd
+import shutil
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # %%
@@ -62,18 +66,6 @@ curr_data=ImageFolder("F:\\FaceExprDecode\\F001")
 print(len(curr_data))
 
 # %%
-    def concat_csv(self):
-        appended_data = []
-        for task_i in self.tasks:
-            data = pd.read_csv(self.csv_file_path+"F001_"+task_i+".csv",header=0)
-            data['subject']=task_i
-            appended_data.append(data)
-        appended_data = pd.concat(appended_data)
-        self.csv_file = appended_data
-
-            def find_pics_from_csv(self):
-
-# %%
 # Scripts to divide dataset into folders
 def concat_csv(csv_file_path, tasks):
     appended_data = []
@@ -89,5 +81,62 @@ pic_tasks = ["T1","T6","T7","T8"]
 f01_csv = concat_csv(f001_csv_path,pic_tasks)
 
 # %%
-train_idx,val_idx=train_test_split(list(range(f01_csv.shape[0])),test_size = 0.30)
+train_idx,val_idx=train_test_split(list(range(f01_csv.shape[0])),test_size = 0.30, random_state=1)
+test_idx,val_idx = train_test_split(val_idx,test_size=0.5,random_state=1)
+
+
+# %%
+def reorganize_pics(csv_file,idx,filepath="F:\\FaceExprDecode\\F001\\",mode="val"):
+    """
+    Reorganize pictures and create corresponding folders (train/test/valid)
+    to contain these pics
+    mode can be test, train or val
+    """
+    _task = np.array(csv_file['subject'])[idx]
+    _picnum = np.array(csv_file['1'])[idx]
+
+    _pic_filenames = [filepath+_task[i]+"\\"+str(_picnum[i])+".jpg" for i in range(len(_task))]
+
+    if path.isdir(filepath+mode):
+        AA=0
+        # TODO: Remove? Requires permission,, complicated
+
+    missing_filenames = []
+
+    for filename in _pic_filenames:
+        counter = 0
+        while not path.exists(filename):
+            counter += 1
+            if counter >= 5:
+                print("Filename not found for ",filename)
+                missing_filenames.append(filename)
+                break
+            filename = '\\'.join(filename.split("\\")[:-1]+["0"+filename.split("\\")[-1]])
+            print(filename)
+        if path.exists(filename):
+            shutil.copy(filename, filepath+mode)
+    return(missing_filenames)
+
+
+# %%
+val_Task = np.array(f01_csv['subject'])[val_idx]
+val_picnum = np.array(f01_csv['1'])[val_idx]
+
+# %%
+val_pic_filenames = ["F:\\FaceExprDecode\\F001\\"+val_Task[i]+"\\"+str(val_picnum[i])+".jpg" for i in range(len(val_Task))]
+# %%
+missing_filenames = []
+for filename in val_pic_filenames:
+    counter = 0
+    while not path.exists(filename):
+        counter += 1
+        if counter >= 5:
+            print("FIlename not found for ",filename)
+            missing_filenames.append(filename)
+            break
+        filename = '\\'.join(filename.split("\\")[:-1]+["0"+filename.split("\\")[-1]])
+        print(filename)
+    if path.exists(filename):
+        shutil.copy(filename, "F:\\FaceExprDecode\\F001\\val")
+
 # %%
