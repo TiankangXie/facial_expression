@@ -21,9 +21,9 @@ class AU_model(nn.Module):
         self.localization = nn.Sequential(
             nn.Conv2d(1,8,kernel_size=7),
             nn.MaxPool2d(2,stride=2),
-            nn.ReLU(True)
+            nn.ReLU(True),
             nn.Conv2d(8,10,kernel_size=5),
-            nn.MaxPool2d(2,stride=2)
+            nn.MaxPool2d(2,stride=2),
             nn.ReLU(True)
         )
         self.fc_loc = nn.Sequential(
