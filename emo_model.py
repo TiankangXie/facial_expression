@@ -3,9 +3,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class AU_model(nn.Module):
+    # def __init__(self):
+    #     super(AU_model,self).__init__()
+    #     self.conv1 = nn.Conv2d(3,10,3)
+    #     self.conv2 = nn.Conv2d(10,10,3)
+    #     self.pool1 = nn.MaxPool2d(2,2)
+
     def __init__(self):
         super(AU_model,self).__init__()
-        self.conv1 = nn.Conv2d(1,10,3)
+        self.conv1 = nn.Conv2d(3,10,3)
         self.conv2 = nn.Conv2d(10,10,3)
         self.pool2 = nn.MaxPool2d(2,2)
         
@@ -19,7 +25,7 @@ class AU_model(nn.Module):
         self.fc2 = nn.Linear(50,7)
 
         self.localization = nn.Sequential(
-            nn.Conv2d(1,8,kernel_size=7),
+            nn.Conv2d(3,8,kernel_size=7),
             nn.MaxPool2d(2,stride=2),
             nn.ReLU(True),
             nn.Conv2d(8,10,kernel_size=5),
@@ -34,20 +40,19 @@ class AU_model(nn.Module):
         self.fc_loc[2].weight.data.zero_()
         self.fc_loc[2].bias.data.copy_(torch.tensor([1,0,0,0,1,0],dtype = torch.float))
     
-    def stn(self,x):
-        xs = self.localization(x)
-        xs = xs.view(-1,640)
-        theta = self.fc_loc(xs)
-        theta = theta.view(-1,2,3)
+    # def stn(self,x):
+    #     xs = self.localization(x)
+    #     xs = xs.view(-1,640)
+    #     theta = self.fc_loc(xs)
+    #     theta = theta.view(-1,2,3)
 
-        grid = F.affine_grid(theta,x.size())
-        x = F.grid_sample(x,grid)
-        return x
+    #     grid = F.affine_grid(theta,x.size())
+    #     x = F.grid_sample(x,grid)
+    #     return x
     
     def forward(self, input):
-        out = self.stn(input)
-
-        out=F.relu(self.conv1(out))
+        #out = self.stn(input)
+        out=F.relu(self.conv1(input))
         out=self.conv2(out)
         out=F.relu(self.pool2(out))
 

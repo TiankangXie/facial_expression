@@ -1,11 +1,13 @@
 # %%
+import sys, importlib
+
 import torch
 import os
 import numpy as np
 from torchvision.datasets import ImageFolder
 from torch.utils.data import Subset
 from sklearn.model_selection import train_test_split
-from torchvision import transforms
+from torchvision import transforms,models
 from torchvision.transforms import Compose, ToTensor, Resize
 from torch.utils.data import DataLoader
 import torch.nn as nn
@@ -16,6 +18,9 @@ import shutil
 from data_loader import image_Loader
 import torch.optim as optim
 from emo_model import AU_model
+
+#importlib.reload(sys.modules['emo_model'])
+#from emo_model import AU_model
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -184,6 +189,92 @@ Dataset01 = image_Loader(csv_dir="F:\\here.csv",img_dir="F:\\FaceExprDecode\\F00
 train_set,test_set = torch.utils.data.random_split(Dataset01,[1000,230])
 train_loader = DataLoader(dataset=train_set,batch_size=50,shuffle=True)
 test_loader = DataLoader(dataset=test_set,batch_size=50,shuffle=True)
-Train(20,train_loader,test_loader,criterion,optimizer,device)
+#Train(20,train_loader,test_loader,criterion,optimizer,device)
 
+# %%
+model = models.vgg16(pretrained=True)
+# %%
+for params in model.parameters():
+    params.requires_grad=False
+
+from collections import OrderedDict
+
+# Build custom classifier
+classifier = nn.Sequential(OrderedDict([('fc1', nn.Linear(25088, 5000)),
+                                        ('relu', nn.ReLU()),
+                                        ('drop', nn.Dropout(p=0.5)),
+                                        ('fc2', nn.Linear(5000, 102)),
+                                        ('output', nn.LogSoftmax(dim=1))]))
+
+model.classifier = classifier
+
+def validation(model, validateloader, criterion):
+    
+    val_loss = 0
+    accuracy = 0
+    
+    for images, labels in iter(validateloader):
+
+        images, labels = images.to('cuda'), labels.to('cuda')
+
+        output = model.forward(images)
+        val_loss += criterion(output, labels).item()
+
+        probabilities = torch.exp(output)
+        
+        equality = (labels.data == probabilities.max(dim=1)[1])
+        accuracy += equality.type(torch.FloatTensor).mean()
+    
+    return val_loss, accuracy
+
+# %%
+criterion = nn.NLLLoss()
+optimizer = optim.Adam(model.classifier.parameters(), lr=0.001)
+
+def train_classifier():
+
+    epochs = 20
+    steps = 0
+    print_every = 40
+
+    model.to('cuda')
+
+    for e in range(epochs):
+    
+        model.train()
+
+        running_loss = 0
+
+        for images, labels in iter(train_loader):
+    
+            steps += 1
+    
+            images, labels = images.to('cuda'), labels.to('cuda')
+    
+            optimizer.zero_grad()
+    
+            output = model.forward(images)
+            loss = criterion(output, labels)
+            loss.backward()
+            optimizer.step()
+    
+            running_loss += loss.item()
+    
+            if steps % print_every == 0:
+            
+                model.eval()
+            
+                # Turn off gradients for validation, saves memory and computations
+                with torch.no_grad():
+                    validation_loss, accuracy = validation(model, validate_loader, criterion)
+        
+                print("Epoch: {}/{}.. ".format(e+1, epochs),
+                        "Training Loss: {:.3f}.. ".format(running_loss/print_every),
+                        "Validation Loss: {:.3f}.. ".format(validation_loss/len(validate_loader)),
+                        "Validation Accuracy: {:.3f}".format(accuracy/len(validate_loader)))
+        
+                running_loss = 0
+                model.train()
+                    
+train_classifier()
 # %%
