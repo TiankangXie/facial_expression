@@ -18,7 +18,8 @@ import shutil
 from data_loader import image_Loader
 import torch.optim as optim
 from emo_model import AU_model
-
+from test_model import toy_Net
+from sklearn.metrics import f1_score
 #importlib.reload(sys.modules['emo_model'])
 #from emo_model import AU_model
 
@@ -159,20 +160,20 @@ f01_csv.iloc[test_idx,:].to_csv("F:\\FaceExprDecode\\F001\\test\\test.csv")
 f01_csv.iloc[val_idx,:].to_csv("F:\\FaceExprDecode\\F001\\val\\val.csv")
 
 # %%
-train_dir = "F:\\FaceExprDecode\\F001\\train\\"
-test_dir = "F:\\FaceExprDecode\\F001\\test\\"
-val_dir = "F:\\FaceExprDecode\\F001\\val\\"
+# train_dir = "F:\\FaceExprDecode\\F001\\train\\"
+# test_dir = "F:\\FaceExprDecode\\F001\\test\\"
+# val_dir = "F:\\FaceExprDecode\\F001\\val\\"
 
-train_csv = train_dir+"train.csv"
-test_csv = test_dir+"test.csv"
-val_csv = val_dir+"val.csv"
+# train_csv = train_dir+"train.csv"
+# test_csv = test_dir+"test.csv"
+# val_csv = val_dir+"val.csv"
 
-train_dataset = image_Loader(csv_dir=train_csv,img_dir=train_dir+"pictures\\",transform=None,action_unit=10)
-test_dataset = image_Loader(csv_dir=test_csv,img_dir=test_dir+"pictures\\",transform=None,action_unit=10)
-val_dataset = image_Loader(csv_dir=val_csv,img_dir=val_dir+"pictures\\",transform=None,action_unit=10)
+# train_dataset = image_Loader(csv_dir=train_csv,img_dir=train_dir+"pictures\\",transform=None,action_unit=10)
+# test_dataset = image_Loader(csv_dir=test_csv,img_dir=test_dir+"pictures\\",transform=None,action_unit=10)
+# val_dataset = image_Loader(csv_dir=val_csv,img_dir=val_dir+"pictures\\",transform=None,action_unit=10)
 
-train_loader = DataLoader(train_dataset,batch_size=50,shuffle=True)
-val_loader = DataLoader(val_dataset,batch_size = 50, shuffle=True)
+# train_loader = DataLoader(train_dataset,batch_size=50,shuffle=True)
+# val_loader = DataLoader(val_dataset,batch_size = 50, shuffle=True)
 
 # %%
 net = AU_model()
@@ -185,96 +186,115 @@ transform = transforms.Compose([
             transforms.CenterCrop(256),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-Dataset01 = image_Loader(csv_dir="F:\\here.csv",img_dir="F:\\FaceExprDecode\\F001\\",transform=transform, action_unit='32')
+Dataset01 = image_Loader(csv_dir="F:\\here.csv",img_dir="F:\\FaceExprDecode\\F001\\",transform=transform, action_unit='6')
 train_set,test_set = torch.utils.data.random_split(Dataset01,[1000,230])
 train_loader = DataLoader(dataset=train_set,batch_size=50,shuffle=True)
 test_loader = DataLoader(dataset=test_set,batch_size=50,shuffle=True)
 #Train(20,train_loader,test_loader,criterion,optimizer,device)
 
 # %%
-model = models.vgg16(pretrained=True)
+model = models.resnet18(pretrained=True)
+print(model)
 # %%
-for params in model.parameters():
-    params.requires_grad=False
-
-from collections import OrderedDict
-
-# Build custom classifier
-classifier = nn.Sequential(OrderedDict([('fc1', nn.Linear(25088, 5000)),
-                                        ('relu', nn.ReLU()),
-                                        ('drop', nn.Dropout(p=0.5)),
-                                        ('fc2', nn.Linear(5000, 102)),
-                                        ('output', nn.LogSoftmax(dim=1))]))
-
-model.classifier = classifier
-
-def validation(model, validateloader, criterion):
-    
-    val_loss = 0
-    accuracy = 0
-    
-    for images, labels in iter(validateloader):
-
-        images, labels = images.to('cuda'), labels.to('cuda')
-
-        output = model.forward(images)
-        val_loss += criterion(output, labels).item()
-
-        probabilities = torch.exp(output)
-        
-        equality = (labels.data == probabilities.max(dim=1)[1])
-        accuracy += equality.type(torch.FloatTensor).mean()
-    
-    return val_loss, accuracy
+for param in model.parameters():
+    param.requires_grad = False
+model.fc = nn.Sequential(nn.Linear(2048,512),
+                        nn.ReLU(),
+                        nn.Dropout(0.2),
+                        nn.Linear(512,10),
+                        nn.LogSoftmax(dim=1)
+)
+criterion=nn.NLLLoss()
+optimizer=optim.Adam(model.fc.parameters(),lr=0.003)
+model.to(device)
 
 # %%
-criterion = nn.NLLLoss()
-optimizer = optim.Adam(model.classifier.parameters(), lr=0.001)
+epochs = 20
+steps = 0
+running_loss = 0
+train_losses, test_losses = [], []
 
-def train_classifier():
-
-    epochs = 20
-    steps = 0
-    print_every = 40
-
-    model.to('cuda')
-
-    for e in range(epochs):
-    
-        model.train()
-
-        running_loss = 0
-
-        for images, labels in iter(train_loader):
-    
-            steps += 1
-    
-            images, labels = images.to('cuda'), labels.to('cuda')
-    
-            optimizer.zero_grad()
-    
-            output = model.forward(images)
-            loss = criterion(output, labels)
-            loss.backward()
-            optimizer.step()
-    
-            running_loss += loss.item()
-    
-            if steps % print_every == 0:
-            
-                model.eval()
-            
-                # Turn off gradients for validation, saves memory and computations
-                with torch.no_grad():
-                    validation_loss, accuracy = validation(model, validate_loader, criterion)
+for epoch in range(epochs):
+    for inputs, labels in train_loader:
+        steps += 1
+        inputs, labels = inputs.to(device), labels.to(device)
+        optimizer.zero_grad()
+        logps = model.forward(inputs)
+        loss = criterion(logps, labels)
+        loss.backward()
+        optimizer.step()
+        running_loss += loss.item()
         
-                print("Epoch: {}/{}.. ".format(e+1, epochs),
-                        "Training Loss: {:.3f}.. ".format(running_loss/print_every),
-                        "Validation Loss: {:.3f}.. ".format(validation_loss/len(validate_loader)),
-                        "Validation Accuracy: {:.3f}".format(accuracy/len(validate_loader)))
-        
-                running_loss = 0
-                model.train()
+        if steps % print_every == 0:
+            test_loss = 0
+            accuracy = 0
+            model.eval()
+            with torch.no_grad():
+                for inputs, labels in test_loader:
+                    inputs, labels = inputs.to(device), labels.to(device)
+                    logps = model.forward(inputs)
+                    batch_loss = criterion(logps, labels)
+                    test_loss += batch_loss.item()
                     
-train_classifier()
+                    ps = torch.exp(logps)
+                    top_p, top_class = ps.topk(1, dim=1)
+                    equals = top_class == labels.view(*top_class.shape)
+                    accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
+            train_losses.append(running_loss/len(trainloader))
+            test_losses.append(test_loss/len(testloader))                    
+            print(f"Epoch {epoch+1}/{epochs}.. "
+                  f"Train loss: {running_loss/print_every:.3f}.. "
+                  f"Test loss: {test_loss/len(testloader):.3f}.. "
+                  f"Test accuracy: {accuracy/len(testloader):.3f}")
+            running_loss = 0
+            model.train()
+# %%
+net01 = toy_Net()
+net01.to(device)
+criterion = nn.NLLLoss()
+optimizer = optim.Adam(net01.parameters(),lr = 0.001)
+
+for epoch in range(5):
+    running_loss = 0.0
+    for i, (inputs, labels) in enumerate(train_loader):
+        
+        inputs, labels = inputs.to(device), labels.to(device)
+        optimizer.zero_grad()
+
+        outputs = net01(inputs)
+        loss = criterion(outputs,labels)
+        loss.backward()
+        optimizer.step()
+
+        running_loss+=loss.item()
+        
+        if i % 500 == 499:    # print every 2000 mini-batches
+            print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, running_loss / 2000))
+            running_loss = 0.0
+
+print('Finished Training')
+# %%
+correct = 0
+total = 0
+
+with torch.no_grad():
+    for images,labels in test_loader:
+        images, labels = images.to(device),labels.to(device)
+
+        outputs = net01(images)
+        
+        _, predicted = torch.max(outputs.data, 1)
+        
+        total += labels.size(0)
+        
+        correct += (predicted == labels).sum().item()
+        print(labels.cpu())
+        print(predicted.cpu())
+        #f1_batch = f1_score(torch.argmax(labels.cpu(),dim=1),outputs.sigmoid().cpu() > 0.5,average='macro')
+
+
+
+print('Accuracy of the network on the 10000 test images: %d %%' % (
+    100 * correct / total))
+
 # %%

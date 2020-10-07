@@ -39,7 +39,7 @@ class image_Loader(Dataset):
         img_filename = self.img_dir+self.csv_file['task'][idx]+"\\"+str(self.csv_file['1'][idx])+".jpg"
         counter=0
         while not os.path.exists(img_filename):
-            #print(img_filename)
+#            print(img_filename)
             counter += 1
             if counter >= 5:
                 print("Filename not found for ",img_filename)
