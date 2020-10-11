@@ -19,7 +19,7 @@ import torch.optim as optim
 from emo_model import AU_model
 from test_model import toy_Net
 from sklearn.metrics import f1_score
-
+from toy_vgg import toy_VGG
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # %%
@@ -87,5 +87,103 @@ with torch.no_grad():
         print(predicted.cpu())
         f1_batch = f1_score(labels.cpu(),predicted.cpu(),average='macro')
         print(f1_batch)
+
+
+# %%
+vgg11_config = [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M']
+
+# %%
+def get_vgg_layers(config, batch_norm):
+    
+    layers = []
+    in_channels = 3
+    
+    for c in config:
+        assert c == 'M' or isinstance(c, int)
+        if c == 'M':
+            layers += [nn.MaxPool2d(kernel_size = 2)]
+        else:
+            conv2d = nn.Conv2d(in_channels, c, kernel_size = 3, padding = 1)
+            if batch_norm:
+                layers += [conv2d, nn.BatchNorm2d(c), nn.ReLU(inplace = True)]
+            else:
+                layers += [conv2d, nn.ReLU(inplace = True)]
+            in_channels = c
+            
+    return nn.Sequential(*layers)
+vgg11_layers = get_vgg_layers(vgg11_config, batch_norm = True)
+print(vgg11_layers)
+# %%
+OUTPUT_DIM = 7
+model = toy_VGG(vgg11_layers,OUTPUT_DIM)
+print(model)
+# IN_FEATURES = pretrained_model.classifier[-1].in_features 
+# final_fc = nn.Linear(IN_FEATURES, OUTPUT_DIM)
+# pretrained_model.classifier[-1] = final_fc
+# print(pretrained_model.classifier)
+
+# %%
+import torchvision.models as models
+pretrained_model = models.vgg11_bn(pretrained=True)
+
+# %%
+pretrained_model.classifier[-1]
+
+# %%
+IN_FEATURES = pretrained_model.classifier[-1].in_features 
+
+final_fc = nn.Linear(IN_FEATURES, OUTPUT_DIM)
+# %%
+pretrained_model.classifier[-1] = final_fc
+
+# %%
+print(pretrained_model.classifier)
+
+# %%
+model.load_state_dict(pretrained_model.state_dict())
+
+# %%
+for parameter in model.classifier[:-1].parameters():
+    parameter.requires_grad = False
+
+# %%    
+START_LR = 1e-7
+
+optimizer = optim.Adam(model.parameters(), lr = START_LR)
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+criterion = nn.CrossEntropyLoss()
+
+model = model.to(device)
+criterion = criterion.to(device)
+# %%
+from LRFinder import LRFinder
+import torch
+END_LR=10
+NUM_ITER=100
+
+lr_finder = LRFinder(model,optimizer,criterion,device)
+lrs,losses = lr_finder.range_test(train_loader,END_LR,NUM_ITER)
+# %%
+
+def plot_lr_finder(lrs, losses, skip_start = 5, skip_end = 5):
+    
+    if skip_end == 0:
+        lrs = lrs[skip_start:]
+        losses = losses[skip_start:]
+    else:
+        lrs = lrs[skip_start:-skip_end]
+        losses = losses[skip_start:-skip_end]
+    
+    fig = plt.figure(figsize = (16,8))
+    ax = fig.add_subplot(1,1,1)
+    ax.plot(lrs, losses)
+    ax.set_xscale('log')
+    ax.set_xlabel('Learning rate')
+    ax.set_ylabel('Loss')
+    ax.grid(True, 'both', 'x')
+    plt.show()
+plot_lr_finder(lrs, losses, skip_start = 10, skip_end = 20)
 
 # %%
