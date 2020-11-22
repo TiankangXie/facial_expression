@@ -15,34 +15,43 @@ task_series=['T1','T6','T7','T8']
 task_labels=['Happiness','Embarassment','Fear or nervous','Pain']
 
 # https://github.com/omarsayed7/Deep-Emotion/blob/master/data_loaders.py
+
 class image_Loader(Dataset):
-    def __init__(self,csv_dir,img_dir,transform,action_unit):
+    def __init__(self, crop_size, csv_dir, img_dir, transform, target_transform, phase):
 
         #==============Labels concatenates============
         self.csv_file = pd.read_csv(csv_dir)
         self.action_unit = action_unit
+        self.crop_size = crop_size
         #self.labels = 
         #==============Images===========================
         #self.img_subset = self.csv_file['0']
         self.img_dir = img_dir
         self.transform = transform
+        self.target_transform = target_transform
+        self.phase = phase
         
     def __len__(self):
         return(len(self.csv_file))
         
     def __getitem__(self,idx):
-        #print("step 0,",idx)
+
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        y_labels = torch.tensor(int(self.csv_file[str(self.action_unit)][idx]))
+        # Load a row of indicies as label
+
+        df2 = self.csv_file.copy()
+        df2.columns = pd.to_numeric(self.csv_file.columns, errors = 'coerce')
+        df2 = df2[df2.columns.dropna()]
+
+        y_labels = torch.tensor(df2.iloc[idx,:].astype('int64'))
         # Remove images that have uknown (9) AU labels.
         if y_labels == 9:
             return None
 
-
-        img_filename = self.img_dir+self.csv_file['task'][idx]+"\\"+str(self.csv_file['1'][idx])+".jpg"
-        counter=0
+        img_filename = self.img_dir + self.csv_file['task'][idx] + "\\" + str(self.csv_file['1'][idx]) + ".jpg"
+        counter = 0
         while not os.path.exists(img_filename):
 #            print(img_filename)
             counter += 1
@@ -53,15 +62,54 @@ class image_Loader(Dataset):
             img_filename = '\\'.join(img_filename.split("\\")[:-1]+["0"+img_filename.split("\\")[-1]])
 
         img = Image.open(img_filename)
-        #img = io.imread(img_filename)
 
+        new_img, landmarks = preprocess_image(img) #Normalize data
+
+        if self.phase == 'train':
+            w,h = new_img.size
+            offset_w = np.random.randint(0,w-self.crop_size) 
+            offset_h = np.random.randint(0,h-self.crop_size)
+            flip = np.random(0,1)
+
+            if self.transform is not None:        
+                img = self.transform(new_img, flip, offset_w, offset_h) #Apply transformation to normalized data
+            if self.target_transform is not None:
+                new_landmarks = self.target_transform(landmarks,flip,offset_w,offset_h)
         
+        elif self.phase == 'test':
+            w,h = new_img.size
+            offset_w = (w-self.crop_size) / 2 
+            offset_h = (h-self.crop_size) / 2
+            if self.transform is not None:        
+                img = self.transform(new_img, 0, offset_w, offset_h) #Apply transformation to normalized data
+            if self.target_transform is not None:
+                new_landmarks = self.target_transform(landmarks,0,offset_w,offset_h)
 
-        if self.transform:
-            img = self.transform(img)
-
-        return(img,y_labels)
+        return(img, y_labels)
     
+
+
+    def calculate_AU_weight(self, occurence_df):
+        """
+        Calculates the AU weight according to a occurence dataframe 
+        inputs: 
+            occurence_df: a pandas dataframe containing occurence of each AU. See BP4D+
+        """
+        #occurence_df = occurence_df.rename(columns = {'two':'new_name'})
+        weight_mtrx = np.zeros((occurence_df.shape[1], 1))
+        for i in range(occurence_df.shape[1]):
+            weight_mtrx[i] = np.sum(occurence_df.iloc[:, i]
+                                    > 0) / float(occurence_df.shape[0])
+        weight_mtrx = 1.0/weight_mtrx
+
+        print(weight_mtrx)
+        weight_mtrx[weight_mtrx == np.inf] = 0
+        print(np.sum(weight_mtrx)*len(weight_mtrx))
+        weight_mtrx = weight_mtrx / (np.sum(weight_mtrx)*len(weight_mtrx))
+
+        return(weight_mtrx)
+
+
 def eval_data_dataloader(csv_file,img_dir,sample_number,action_unit,transform=None):
     if transform is None:
         transform = transforms.Compose([

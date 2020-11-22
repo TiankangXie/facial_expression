@@ -1,6 +1,5 @@
 # %%
 import sys, importlib
-
 import torch
 import os
 import numpy as np
@@ -9,7 +8,7 @@ from torch.utils.data import Subset
 from sklearn.model_selection import train_test_split
 from torchvision import transforms,models
 from torchvision.transforms import Compose, ToTensor, Resize
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import PIL.Image
@@ -20,11 +19,11 @@ import torch.optim as optim
 from emo_model import AU_model
 from test_model import toy_Net
 from sklearn.metrics import f1_score
-#importlib.reload(sys.modules['emo_model'])
-#from emo_model import AU_model
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+# %%
+ACTION_UNIT = '6'
 # %%
 def train_val_dataset(dataset,val_split = 0.25):
     train_idx,val_idx=train_test_split(list(range(len(dataset))),test_size = 0.25)
@@ -33,51 +32,16 @@ def train_val_dataset(dataset,val_split = 0.25):
     datasets['test'] = Subset(dataset,val_idx)
     return(datasets)
 
+def collate_fn(batch):
+    #https://github.com/pytorch/pytorch/issues/1137
+    batch = list(filter(lambda x: x is not None, batch))
+    return torch.utils.data.dataloader.default_collate(batch)
 # %%
-def Train(epochs,train_loader,val_loader,criterion,optimizer,device):
-    print("===================Starting to train==========================")
-    for e in range(epochs):
-        train_loss=0
-        validation_loss=0
-        train_correct=0
-        val_correct=0
-
-        net.train()
-        for data,labels in train_loader:
-            data,labels = data.to(device), labels.to(device)
-            #net.cleargrads()
-            outputs = net(data)
-            loss = criterion(outputs,labels)
-            loss.backward()
-            optimizer.step()
-            train_loss+=loss.item()
-            _,preds = torch.max(outputs,1)
-            train_correct += torch.sum(preds==labels.data)
-        
-        net.eval()
-        for data,labels in val_loader:
-            data,labels = data.to(device), labels.to(device)
-            val_outputs = net(data)
-            val_loss = criterion(val_outputs,labels)
-            validation_loss+=val_loss.item()
-            _,val_preds = torch.max(val_outputs,1)
-            val_correct+=torch.sum(val_preds==labels.data)
-
-        train_loss = train_loss/len(train_dataset)
-        train_acc = train_correct.double() / len(train_dataset)
-        validation_loss =  validation_loss / len(validation_dataset)
-        val_acc = val_correct.double() / len(validation_dataset)
-        print('Epoch: {} \tTraining Loss: {:.8f} \tValidation Loss {:.8f} \tTraining Acuuarcy {:.3f}% \tValidation Acuuarcy {:.3f}%'
-                                                           .format(e+1, train_loss,validation_loss,train_acc * 100, val_acc*100))
-    torch.save(net.state_dict(),"emo_mode-{}-{}-{}.pt".format(epochs,batchsize,lr))
-
+# curr_data=ImageFolder("F:\\FaceExprDecode\\F001")
+# print(len(curr_data))
 
 # %%
-curr_data=ImageFolder("F:\\FaceExprDecode\\F001")
-print(len(curr_data))
-
-# %%
-# Scripts to divide dataset into folders
+# Scripts to combine label csv files into a single one
 def concat_csv(csv_file_path, tasks):
     appended_data = []
     for task_i in tasks:
@@ -90,11 +54,10 @@ f001_csv_path = "F:/FaceExprDecode/F001_label/"
 pic_tasks = ["T1","T6","T7","T8"]
 
 f01_csv = concat_csv(f001_csv_path,pic_tasks).reset_index()
-
 # %%
+# Split into train and validation index
 train_idx,val_idx=train_test_split(list(range(f01_csv.shape[0])),test_size = 0.30, random_state=1)
 test_idx,val_idx = train_test_split(val_idx,test_size=0.5,random_state=1)
-
 
 # %%
 def reorganize_pics(csv_file,idx,filepath="F:\\FaceExprDecode\\F001\\",mode="val\\pictures"):
@@ -181,16 +144,27 @@ net.to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(net.parameters(),lr = 0.001)
 # %%
+# Oversampling to counter class imbalance
+# Usually it will start from 0
+class_count = f01_csv[ACTION_UNIT].value_counts()
+class_weights_global = [1/class_count[0],1/class_count[1]]
+weighted_sampler = WeightedRandomSampler(
+    weights=class_weights_global,
+    num_samples=len(class_weights_global),
+    replacement=True
+)
+# %%
+# Data transformers and loaders here
 transform = transforms.Compose([
             transforms.Resize(257),
             transforms.CenterCrop(256),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-Dataset01 = image_Loader(csv_dir="F:\\here.csv",img_dir="F:\\FaceExprDecode\\F001\\",transform=transform, action_unit='6')
+Dataset01 = image_Loader(csv_dir="F:\\here.csv",img_dir="F:\\FaceExprDecode\\F001\\",transform=transform, action_unit=ACTION_UNIT)
 train_set,test_set = torch.utils.data.random_split(Dataset01,[1000,230])
-train_loader = DataLoader(dataset=train_set,batch_size=50,shuffle=True)
-test_loader = DataLoader(dataset=test_set,batch_size=50,shuffle=True)
-#Train(20,train_loader,test_loader,criterion,optimizer,device)
+train_loader = DataLoader(dataset=train_set,batch_size=50, collate_fn=collate_fn,shuffle=False, sampler=weighted_sampler)
+test_loader = DataLoader(dataset=test_set,batch_size=50,collate_fn=collate_fn, shuffle=False, sampler=weighted_sampler)
+
 
 # %%
 model = models.resnet18(pretrained=True)
@@ -251,7 +225,7 @@ for epoch in range(epochs):
 # %%
 net01 = toy_Net()
 net01.to(device)
-criterion = nn.NLLLoss()
+criterion = nn.BCELoss()
 optimizer = optim.Adam(net01.parameters(),lr = 0.001)
 
 for epoch in range(5):

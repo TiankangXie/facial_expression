@@ -1,14 +1,18 @@
-#This script serves to work on face recognition and landmark detection using
-#OpenCV
+# This script serves to work on face recognition and landmark detection using
+# OpenCV. Also calculates the occurlar lengths
+# Runs dlib 68-point landmark detection
 # %%
 import cv2 as cv
 import matplotlib.pyplot as plt
 # https://morioh.com/p/d313e9b5c65f
 # Read image from system
 # %%
-origin_image = cv.imread("F:/stalin_0.jpg")
+origin_image = cv.imread("F:\\FaceExprDecode\\F001\\T1\\0004.jpg")
 grayscale_image = cv.cvtColor(origin_image, cv.COLOR_BGR2GRAY)
 
+# Histogram normalization
+hist_n = cv.equalizeHist(grayscale_image)
+plt.imshow(hist_n)
 # %%
 face_cascade = cv.CascadeClassifier("C:\ProgramData\Anaconda3\envs\pytorches\Library\etc\haarcascades\haarcascade_frontalface_alt.xml")
 detected_faces = face_cascade.detectMultiScale(grayscale_image)
@@ -38,6 +42,4 @@ plt.imshow(origin_image)
 
 #plt.axis("off")
 #plt.imshow(grayscale_image)
-# %%
-
 # %%
