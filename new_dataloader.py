@@ -21,7 +21,7 @@ class image_Loader(Dataset):
 
         #==============Labels concatenates============
         self.csv_file = pd.read_csv(csv_dir)
-        self.action_unit = action_unit
+        #self.action_unit = action_unit
         self.crop_size = crop_size
         #self.labels = 
         #==============Images===========================
@@ -34,7 +34,7 @@ class image_Loader(Dataset):
     def __len__(self):
         return(len(self.csv_file))
         
-    def __getitem__(self,idx):
+    def __getitem__(self, idx):
 
         if torch.is_tensor(idx):
             idx = idx.tolist()
@@ -45,10 +45,10 @@ class image_Loader(Dataset):
         df2.columns = pd.to_numeric(self.csv_file.columns, errors = 'coerce')
         df2 = df2[df2.columns.dropna()]
 
-        y_labels = torch.tensor(df2.iloc[idx,:].astype('int64'))
+        y_labels = torch.tensor(df2.iloc[idx,:].astype('int64').to_numpy())
         # Remove images that have uknown (9) AU labels.
-        if y_labels == 9:
-            return None
+        #if y_labels == 9:
+        #    return None
 
         img_filename = self.img_dir + self.csv_file['task'][idx] + "\\" + str(self.csv_file['1'][idx]) + ".jpg"
         counter = 0
@@ -62,20 +62,21 @@ class image_Loader(Dataset):
             img_filename = '\\'.join(img_filename.split("\\")[:-1]+["0"+img_filename.split("\\")[-1]])
 
         img = Image.open(img_filename)
-
-        new_img, landmarks = preprocess_image(img) #Normalize data
+        print(img_filename)
+        new_img, landmarks, new_biocular_dist = preprocess_image(img) #Normalize data
 
         if self.phase == 'train':
-            w,h = new_img.size
+            w = new_img.shape[0]; h = new_img.shape[1]
             offset_w = np.random.randint(0,w-self.crop_size) 
             offset_h = np.random.randint(0,h-self.crop_size)
-            flip = np.random(0,1)
-
+            flip = np.random.randint(0,1)
+            print(new_img)
+            print(type(new_img))
             if self.transform is not None:        
-                img = self.transform(new_img, flip, offset_w, offset_h) #Apply transformation to normalized data
+                img = self.transform(new_img, flip, offset_w, offset_h) # Apply transformation to normalized data
             if self.target_transform is not None:
                 new_landmarks = self.target_transform(landmarks,flip,offset_w,offset_h)
-        
+
         elif self.phase == 'test':
             w,h = new_img.size
             offset_w = (w-self.crop_size) / 2 
@@ -85,29 +86,8 @@ class image_Loader(Dataset):
             if self.target_transform is not None:
                 new_landmarks = self.target_transform(landmarks,0,offset_w,offset_h)
 
-        return(img, y_labels)
-    
+        return(img, new_landmarks, new_biocular_dist, y_labels)
 
-
-    def calculate_AU_weight(self, occurence_df):
-        """
-        Calculates the AU weight according to a occurence dataframe 
-        inputs: 
-            occurence_df: a pandas dataframe containing occurence of each AU. See BP4D+
-        """
-        #occurence_df = occurence_df.rename(columns = {'two':'new_name'})
-        weight_mtrx = np.zeros((occurence_df.shape[1], 1))
-        for i in range(occurence_df.shape[1]):
-            weight_mtrx[i] = np.sum(occurence_df.iloc[:, i]
-                                    > 0) / float(occurence_df.shape[0])
-        weight_mtrx = 1.0/weight_mtrx
-
-        print(weight_mtrx)
-        weight_mtrx[weight_mtrx == np.inf] = 0
-        print(np.sum(weight_mtrx)*len(weight_mtrx))
-        weight_mtrx = weight_mtrx / (np.sum(weight_mtrx)*len(weight_mtrx))
-
-        return(weight_mtrx)
 
 
 def eval_data_dataloader(csv_file,img_dir,sample_number,action_unit,transform=None):
@@ -131,3 +111,4 @@ def eval_data_dataloader(csv_file,img_dir,sample_number,action_unit,transform=No
 #eval_data_dataloader(csv_file="F:\FaceExprDecode\demo_labels\F001_T1.csv", img_dir="F:/FaceExprDecode/demo_pics/",sample_number=10)
 #eval_data_dataloader(train_csv,img_dir="F:\\FaceExprDecode\\F001\\train\\",sample_number=5,action_unit="32")
 # eval_data_dataloader(csv_file="F:\\FaceExprDecode\\F001\\train\\train.csv",img_dir="F:\\FaceExprDecode\\F001\\",sample_number=10,action_unit="32")
+# %%

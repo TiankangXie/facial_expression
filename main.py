@@ -24,7 +24,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # %%
 def train_val_dataset(dataset,val_split = 0.25):
-    train_idx,val_idx=train_test_split(list(range(len(dataset))),test_size = 0.25)
+    train_idx,val_idx = train_test_split(list(range(len(dataset))),test_size = 0.25)
     datasets = {}
     datasets['train'] = Subset(dataset,train_idx)
     datasets['test'] = Subset(dataset,val_idx)

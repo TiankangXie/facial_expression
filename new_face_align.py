@@ -4,6 +4,9 @@ import os
 import math
 # Many parts of the code derived from https://github.com/ZhiwenShao/PyTorch-JAANet/blob/master/dataset/face_transform.py
 # Modified it to fit the 68 point face landmarks
+#face_cascade = cv2.CascadeClassifier("C:\ProgramData\Anaconda3\envs\pytorches\Library\etc\haarcascades\haarcascade_frontalface_alt.xml")
+#face_landmark = cv2.face.createFacemarkLBF()
+#face_landmark.loadModel('F:/lbfmodel.yaml.txt')
 
 def align_face_68pts(img, landmarks, box_enlarge, img_size):
     """
@@ -84,23 +87,29 @@ def ocular_dist(landmarks):
 
     return(ocular_distance)
 
-def preprocess_image(img, Enlarge_fac = 2.9, img_size = 200):
+def preprocess_image(img, Enlarge_fac = 2.9, img_size = 200): 
+#face_cascade = cv2.CascadeClassifier("C:\ProgramData\Anaconda3\envs\pytorches\Library\etc\haarcascades\haarcascade_frontalface_alt.xml")
+#face_landmark = cv2.face.createFacemarkLBF()
+#face_landmark.loadModel('F:/lbfmodel.yaml.txt')
+
+    face_cascade = cv2.CascadeClassifier("C:\ProgramData\Anaconda3\envs\pytorches\Library\etc\haarcascades\haarcascade_frontalface_alt.xml")
+    face_landmark = cv2.face.createFacemarkLBF()
+    face_landmark.loadModel('F:/lbfmodel.yaml.txt')
 
     ENLARGE_FACTOR = Enlarge_fac
     IMG_SIZE = img_size
-
+    #print(img)
+    #print(type(img))
+    img = np.array(img)
     grayscale_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    face_cascade = cv2.CascadeClassifier("C:\ProgramData\Anaconda3\envs\pytorches\Library\etc\haarcascades\haarcascade_frontalface_alt.xml")
     detected_faces = face_cascade.detectMultiScale(grayscale_image)
-
-    face_landmark = cv2.face.createFacemarkLBF()
-    face_landmark.loadModel('F:/lbfmodel.yaml.txt')
+    #print(grayscale_image.shape)
+    #print(detected_faces.shape)
     ok, landmarks = face_landmark.fit(grayscale_image, detected_faces)
-
-    new_img, new_landmarks = align_face_68pts(img, landmarks, ENLARGE_FACTOR, IMG_SIZE)
+    
+    new_img, new_landmarks = align_face_68pts(img, landmarks[0][0], ENLARGE_FACTOR, IMG_SIZE)
 
     new_ocular_dist = ocular_dist(new_landmarks)
 
-    return(new_img,new_landmarks)
+    return(new_img, new_landmarks, new_ocular_dist)
 
