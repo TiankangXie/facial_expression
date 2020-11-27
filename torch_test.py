@@ -54,6 +54,10 @@ f001_csv_path = "F:/FaceExprDecode/F001_label/"
 pic_tasks = ["T1","T6","T7","T8"]
 
 f01_csv = concat_csv(f001_csv_path,pic_tasks).reset_index()
+
+# %%
+
+
 # %%
 # Split into train and validation index
 train_idx,val_idx=train_test_split(list(range(f01_csv.shape[0])),test_size = 0.30, random_state=1)

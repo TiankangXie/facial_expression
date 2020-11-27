@@ -12,6 +12,20 @@ class setFlip(object):
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
         return(img)
 
+class Place_crop(object):
+    def __init__(self,size,start_x,start_y):
+        if isinstance(size, int):
+            self.size = (int(size),int(size))
+
+        else:
+            self.size = size
+        self.start_x = start_x
+        self.start_y = start_y
+
+    def __call__(self,img):
+        th,tw = self.size
+        return(img.crop((self.start_x,self.start_y,self.start_x+tw, self.start_y+th)))
+
 
 class image_trian(object):
     def __init__(self, crop_size):
@@ -21,19 +35,22 @@ class image_trian(object):
         # normalize = transforms.Normalize(mean=[0.5, 0.5, 0.5],
         #                                  std=[0.5, 0.5, 0.5])
         if isinstance(img, np.ndarray):
-            img = Image.fromarray(img)
+           img = Image.fromarray(img)
 
         transform = transforms.Compose([
+            #transforms.ToTensor(),
             #transforms.ToPILImage(),
-            transforms.functional.crop(
-                img, top=offset_x, left=offset_y, height=img.size[0], width=img.size[1]),
+            #transforms.functional.crop(
+            #    img, top=offset_x, left=offset_y, height=img.size[0], width=img.size[1]),
+            Place_crop(self.crop_size,offset_x,offset_y),
             setFlip(flip),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.5, 0.5, 0.5],
                                  std=[0.5, 0.5, 0.5])
+            #transforms.ToTensor()
         ])
-
-        #img = transform(Image.fromarray(np.uint8(img)))
+        #return(transform)
+        img = transform(img)
         return (img)
 
 

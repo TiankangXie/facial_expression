@@ -369,10 +369,11 @@ def calculate_AU_weight(occurence_df):
             occurence_df: a pandas dataframe containing occurence of each AU. See BP4D+
         """
         #occurence_df = occurence_df.rename(columns = {'two':'new_name'})
-        weight_mtrx = np.zeros((occurence_df.shape[1], 1))
-        for i in range(occurence_df.shape[1]):
-            weight_mtrx[i] = np.sum(occurence_df.iloc[:, i]
-                                    > 0) / float(occurence_df.shape[0])
+        occurence_df2 = occurence_df.iloc[:,2::]
+        weight_mtrx = np.zeros((occurence_df2.shape[1], 1))
+        for i in range(occurence_df2.shape[1]):
+            weight_mtrx[i] = np.sum(occurence_df2.iloc[:, i]
+                                    > 0) / float(occurence_df2.shape[0])
         weight_mtrx = 1.0/weight_mtrx
 
         #print(weight_mtrx)
@@ -405,7 +406,7 @@ def main():
                                     transform = image_trian(crop_size=CONFIG_CROP_SIZE), phase = 'train',
                                     target_transform=landmark_transform(img_size=CONFIG_CROP_SIZE, flip_reflect=np.loadtxt(CONFIG_flip_reflect,dtype = 'int',delimiter=","))
                         )
-    train_set,test_set = torch.utils.data.random_split(dsets,[1000,230])
+    train_set,test_set = torch.utils.data.random_split(dsets,[6000,531])
     
 
     # CHANGEME
@@ -608,7 +609,7 @@ def main():
 
 CONFIG_CROP_SIZE = 176
 CONFIG_csvdir = "F:\\here.csv"
-CONFIG_imgdir = "F:\\FaceExprDecode\\F001\\"
+CONFIG_imgdir = "F:\\FaceExprDecode\\"
 CONFIG_flip_reflect = "F:\\facial_expression\\reflect_68.txt"
 CONFIG_unit_dim = 8
 CONFIG_land_num = 68

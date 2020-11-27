@@ -64,10 +64,10 @@ class LocalConv2dReLU(nn.Module):
         self.bns = nn.ModuleList([nn.BatchNorm2d(in_channels)
                                   for i in range(local_h_num*local_w_num)])
 
-        if activation_type == 'ReLu':
+        if activation_type == 'ReLU':
             self.relus = nn.ModuleList(
                 [nn.ReLU(inplace=True) for i in range(local_h_num*local_w_num)])
-        elif activation_type == 'PReLu':
+        elif activation_type == 'PReLU':
             self.relus = nn.ModuleList([nn.PReLU()
                                         for i in range(local_h_num*local_w_num)])
 

@@ -40,17 +40,14 @@ class image_Loader(Dataset):
             idx = idx.tolist()
 
         # Load a row of indicies as label
-
         df2 = self.csv_file.copy()
         df2.columns = pd.to_numeric(self.csv_file.columns, errors = 'coerce')
         df2 = df2[df2.columns.dropna()]
 
         y_labels = torch.tensor(df2.iloc[idx,:].astype('int64').to_numpy())
         # Remove images that have uknown (9) AU labels.
-        #if y_labels == 9:
-        #    return None
 
-        img_filename = self.img_dir + self.csv_file['task'][idx] + "\\" + str(self.csv_file['1'][idx]) + ".jpg"
+        img_filename = self.img_dir + self.csv_file['Subject'][idx] + "\\" + self.csv_file['Task'][idx] + "\\" + str(self.csv_file['Number'][idx]) + ".jpg"
         counter = 0
         while not os.path.exists(img_filename):
 #            print(img_filename)
@@ -74,6 +71,7 @@ class image_Loader(Dataset):
             print(type(new_img))
             if self.transform is not None:        
                 img = self.transform(new_img, flip, offset_w, offset_h) # Apply transformation to normalized data
+                #img = curr_transform(new_img)
             if self.target_transform is not None:
                 new_landmarks = self.target_transform(landmarks,flip,offset_w,offset_h)
 
@@ -83,6 +81,7 @@ class image_Loader(Dataset):
             offset_h = (h-self.crop_size) / 2
             if self.transform is not None:        
                 img = self.transform(new_img, 0, offset_w, offset_h) #Apply transformation to normalized data
+                #img = curr_transform(new_img)
             if self.target_transform is not None:
                 new_landmarks = self.target_transform(landmarks,0,offset_w,offset_h)
 
