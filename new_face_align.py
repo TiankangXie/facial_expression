@@ -87,14 +87,11 @@ def ocular_dist(landmarks):
 
     return(ocular_distance)
 
-def preprocess_image(img, Enlarge_fac = 2.9, img_size = 200): 
+def preprocess_image(img, Enlarge_fac = 2.9, img_size = 200, face_landmark = None, face_cascade = None): 
 #face_cascade = cv2.CascadeClassifier("C:\ProgramData\Anaconda3\envs\pytorches\Library\etc\haarcascades\haarcascade_frontalface_alt.xml")
 #face_landmark = cv2.face.createFacemarkLBF()
 #face_landmark.loadModel('F:/lbfmodel.yaml.txt')
 
-    face_cascade = cv2.CascadeClassifier("C:\ProgramData\Anaconda3\envs\pytorches\Library\etc\haarcascades\haarcascade_frontalface_alt.xml")
-    face_landmark = cv2.face.createFacemarkLBF()
-    face_landmark.loadModel('F:/lbfmodel.yaml.txt')
 
     ENLARGE_FACTOR = Enlarge_fac
     IMG_SIZE = img_size

@@ -10,9 +10,14 @@ import matplotlib.pyplot as plt
 import glob
 from skimage import io
 from new_face_align import preprocess_image
+import cv2
 
 task_series=['T1','T6','T7','T8']
 task_labels=['Happiness','Embarassment','Fear or nervous','Pain']
+
+face_cascade1 = cv2.CascadeClassifier("C:\ProgramData\Anaconda3\envs\pytorches\Library\etc\haarcascades\haarcascade_frontalface_alt.xml")
+face_landmark1 = cv2.face.createFacemarkLBF()
+face_landmark1.loadModel('F:/lbfmodel.yaml.txt')
 
 # https://github.com/omarsayed7/Deep-Emotion/blob/master/data_loaders.py
 
@@ -44,7 +49,10 @@ class image_Loader(Dataset):
         df2.columns = pd.to_numeric(self.csv_file.columns, errors = 'coerce')
         df2 = df2[df2.columns.dropna()]
 
-        y_labels = torch.tensor(df2.iloc[idx,:].astype('int64').to_numpy())
+        y_labels = torch.tensor(df2[[1.0,2.0,4.0,6.0,7.0,10.0,12.0,14.0,15.0,17.0,23.0,24.0]].iloc[0,:].to_numpy())
+
+        #y_labels = torch.tensor(df2.iloc[idx,:].astype('int64').to_numpy())
+        #
         # Remove images that have uknown (9) AU labels.
 
         img_filename = self.img_dir + self.csv_file['Subject'][idx] + "\\" + self.csv_file['Task'][idx] + "\\" + str(self.csv_file['Number'][idx]) + ".jpg"
@@ -60,15 +68,15 @@ class image_Loader(Dataset):
 
         img = Image.open(img_filename)
         print(img_filename)
-        new_img, landmarks, new_biocular_dist = preprocess_image(img) #Normalize data
+        new_img, landmarks, new_biocular_dist = preprocess_image(img, face_landmark=face_landmark1, face_cascade=face_cascade1) #Normalize data
 
         if self.phase == 'train':
             w = new_img.shape[0]; h = new_img.shape[1]
             offset_w = np.random.randint(0,w-self.crop_size) 
             offset_h = np.random.randint(0,h-self.crop_size)
             flip = np.random.randint(0,1)
-            print(new_img)
-            print(type(new_img))
+            #print(new_img)
+            #print(type(new_img))
             if self.transform is not None:        
                 img = self.transform(new_img, flip, offset_w, offset_h) # Apply transformation to normalized data
                 #img = curr_transform(new_img)
@@ -86,7 +94,6 @@ class image_Loader(Dataset):
                 new_landmarks = self.target_transform(landmarks,0,offset_w,offset_h)
 
         return(img, new_landmarks, new_biocular_dist, y_labels)
-
 
 
 def eval_data_dataloader(csv_file,img_dir,sample_number,action_unit,transform=None):

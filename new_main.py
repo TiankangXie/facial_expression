@@ -1,3 +1,6 @@
+# TODO:
+# Correct for the number of label classes.
+
 import torch.optim as optim
 import torch.utils.data as util_data
 import itertools
@@ -369,7 +372,8 @@ def calculate_AU_weight(occurence_df):
             occurence_df: a pandas dataframe containing occurence of each AU. See BP4D+
         """
         #occurence_df = occurence_df.rename(columns = {'two':'new_name'})
-        occurence_df2 = occurence_df.iloc[:,2::]
+        #occurence_df2 = occurence_df.iloc[:,2::]
+        occurence_df2 = occurence_df[['1','2', '4','6','7','10','12','14','15','17','23','24']]
         weight_mtrx = np.zeros((occurence_df2.shape[1], 1))
         for i in range(occurence_df2.shape[1]):
             weight_mtrx[i] = np.sum(occurence_df2.iloc[:, i]
@@ -382,9 +386,6 @@ def calculate_AU_weight(occurence_df):
         weight_mtrx = weight_mtrx / (np.sum(weight_mtrx)*len(weight_mtrx))
 
         return(weight_mtrx)
-
-# %%
-
 
 
 def main():
@@ -411,7 +412,7 @@ def main():
 
     # CHANGEME
     au_mk0 = pd.read_csv(CONFIG_csvdir)
-    au_mk0 = calculate_AU_weight(au_mk0.iloc[:,2:-1])
+    au_mk0 = calculate_AU_weight(au_mk0[['1','2', '4','6','7','10','12','14','15','17','23','24']])
     au_weight = torch.from_numpy(au_mk0)
 
     if use_gpu:
@@ -420,8 +421,8 @@ def main():
         au_weight = au_weight.float()
 
 
-    train_loader = util_data.DataLoader(dataset=train_set,batch_size=50,shuffle=True)
-    test_loader = util_data.DataLoader(dataset=test_set,batch_size=50,shuffle=True)
+    train_loader = util_data.DataLoader(dataset=train_set,batch_size=8,shuffle=True)
+    test_loader = util_data.DataLoader(dataset=test_set,batch_size=8,shuffle=True)
     
     dset_loaders['train'] = train_loader
     dset_loaders['test'] = test_loader
@@ -489,8 +490,6 @@ def main():
                                                                 au_net_parameter_list),
                                                 lr=1.0, momentum=CONFIG_momentum, weight_decay=CONFIG_weight_decay,
                                                 nesterov=CONFIG_use_nesterov)
-    
-
 
     param_lr = []
 

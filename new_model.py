@@ -203,7 +203,6 @@ def generate_map(map, crop_size, map_size, spatial_ratio, fill_coeff, center1_x,
             for w in range(int(start_w), int(end_w)+1):
                 map[h,w] = max(1 - (abs(h - AU_center_y) + abs(w - AU_center_x)) *
                                  fill_coeff / (map_size*spatial_ratio), map[h,w])
-
 class AlignNet(nn.Module):
     def __init__(self, crop_size, map_size, au_num, land_num, input_dim, unit_dim=8,
                  spatial_ratio=0.14, fill_coeff=0.56):
@@ -231,14 +230,19 @@ class AlignNet(nn.Module):
     def forward(self, x):
         align_feat_out = self.align_feat(x) #Derived from HLFeatExtractor layers
         align_feat = align_feat_out.view(align_feat_out.size(0), -1) # Convert to 2d array (to be used later to predicts landmarks?)
+        #align_feat.reshape((align_feat.shape[0],-1,2))
+        
         align_output = self.align_output(align_feat) # Predicting landmarks. Has shape (unit_dim * 64, land_num * 2)
-
+        align_output = align_output.reshape((align_output.shape[0],-1,2))
+        third_dimension = torch.from_numpy(np.ones((align_output.shape[0],align_output.shape[1], 1))).cuda()
+        align_output = torch.cat((align_output,third_dimension),2)
+        #align_output = self.align_output
         aus_map = torch.zeros((align_output.size(0), self.au_num, self.map_size + 8, self.map_size + 8)) # Not sure why they add 8. But is an AU map?
 
         for i in range(align_output.size(0)):
             land_array = align_output[i,:] # A series of landmarks 
             land_array = land_array.data.cpu().numpy() 
-            str_dt = np.append(land_array[0:len(land_array):2], land_array[1:len(land_array):2]) # Split landmark files to x, y coordinates
+            str_dt = np.append(land_array[:,0], land_array[:,1]) # Split landmark files to x, y coordinates
             arr2d = np.array(str_dt).reshape((2, self.land_num)) # Anothe reshape...
             ruler = abs(arr2d[0, 39] - arr2d[0, 42]) # This is essentially ocular distance
 
@@ -392,27 +396,27 @@ class LocalAUNetv2(nn.Module):
                 nn.Linear(unit_dim*8, 2)
             ) for i in range(au_num)])
         
-        def forward(self, feat, aus_map):
-            for i in range(len(self.local_aus_output)):
-                au_map = aus_map[:,i,:,:]
-                au_map = au_map.unsqueeze(1)
-                au_feat = feat*au_map
-                output_au_feat = self.local_aus_branch[i](au_feat)
-                reshape_output_au_feat = output_au_feat.view(output_au_feat.size(0), -1)
-                au_output = self.local_aus_output[i](reshape_output_au_feat)
-                au_output = au_output.view(au_output.size(0), 2, int(au_output.size(1) / 2))
-                au_output = F.log_softmax(au_output, dim=1)
+    def forward(self, feat, aus_map):
+        for i in range(len(self.local_aus_output)):
+            au_map = aus_map[:,i,:,:]
+            au_map = au_map.unsqueeze(1)
+            au_feat = feat*au_map
+            output_au_feat = self.local_aus_branch[i](au_feat)
+            reshape_output_au_feat = output_au_feat.view(output_au_feat.size(0), -1)
+            au_output = self.local_aus_output[i](reshape_output_au_feat)
+            au_output = au_output.view(au_output.size(0), 2, int(au_output.size(1) / 2))
+            au_output = F.log_softmax(au_output, dim=1)
 
-                if i == 0:
-                    aus_feat = output_au_feat
-                    aus_output = au_output
-                else:
-                    aus_feat = aus_feat + output_au_feat
-                    aus_output = torch.cat((aus_output, au_output), 2)
+            if i == 0:
+                aus_feat = output_au_feat
+                aus_output = au_output
+            else:
+                aus_feat = aus_feat + output_au_feat
+                aus_output = torch.cat((aus_output, au_output), 2)
 
-            # average over all AUs
-            aus_feat = aus_feat / float(len(self.local_aus_branch))
-            return aus_feat, aus_output
+        # average over all AUs
+        aus_feat = aus_feat / float(len(self.local_aus_branch))
+        return aus_feat, aus_output
 
 class AUNet(nn.Module):
     def __init__(self, au_num, input_dim = 12000, unit_dim = 8):
@@ -435,4 +439,5 @@ network_dict = {'HLFeatExtractor':HLFeatExtractor, 'HMRegionLearning':HMRegionLe
                 'AlignNet':AlignNet, 'LocalAttentionRefine':LocalAttentionRefine,
                 'LocalAUNetv2':LocalAUNetv2, 'AUNet':AUNet
                 }
+
 

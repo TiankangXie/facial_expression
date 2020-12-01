@@ -44,7 +44,7 @@ def _construct_imag_csv(gen_path, subj_names, task_names, face_cascade = face_ca
             pic_subj += [subj]*len(valid_jpgs)
             pic_task += [task]*len(valid_jpgs)
             pic_num += [i.split("\\")[-1].split(".")[0] for i in valid_jpgs]
-
+            
             temp_df1 = pd.DataFrame(list(zip(pic_subj, pic_task, pic_num)), 
                columns =['Subject', 'Task', 'Number'])
             
